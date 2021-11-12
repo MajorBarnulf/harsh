@@ -11,7 +11,7 @@ pub struct Logger {
 
 impl Logger {
 	/// adapt the static instance according to parameters specified by the configuration
-	pub fn new(_config: &Configuration) -> Self {
+	pub fn new(_config: Configuration) -> Self {
 		Logger {}
 	}
 

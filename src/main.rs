@@ -1,6 +1,10 @@
+///
+/// library module
+///
 pub mod lib;
 
-pub fn main() {
+#[tokio::main]
+pub async fn main() {
 	println!("Hello, harmony!");
-	lib::harsh::main();
+	lib::harsh::main().await;
 }

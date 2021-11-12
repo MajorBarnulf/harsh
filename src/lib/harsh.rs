@@ -1,33 +1,68 @@
+use std::error;
+use std::sync::{Arc, RwLock};
+
 use super::config::Configuration;
-use super::database::DbManager;
+use super::db::DbManager;
 use super::http::HttpManager;
 use super::log::Logger;
 
 ///
 /// main function
 ///
-pub fn main() {
-	let configuration = Configuration::read();
+pub async fn main() {
+	let configuration = Configuration::get();
+	let instance = Harsh::new(configuration);
+	instance.serve().await;
 }
 
 pub struct Harsh {
-	db_manager: DbManager,
-	logger: Logger,
-	http_manager: HttpManager,
+	pub shared_state: SharedState,
+	pub http_manager: HttpManager,
 }
 
 impl Harsh {
 	pub fn new(configuration: Configuration) -> Self {
-		let db_manager = DbManager::new(&configuration);
-		let logger = Logger::new(&configuration);
-		let http_manager = HttpManager::new();
+		let db_manager =
+			DbManager::new(configuration.clone()).expect("failed to open / create the database");
+		let logger = Logger::new(configuration.clone());
+		let shared_state = State::new_shared(db_manager, logger);
+		let http_manager = HttpManager::new(configuration.clone(), shared_state.clone());
 
 		Harsh {
-			logger,
-			db_manager,
+			shared_state,
 			http_manager,
 		}
 	}
 
-	fn serve(&mut self) {}
+	pub async fn serve(self) {
+		self.http_manager.serve().await;
+	}
 }
+
+///
+/// shared state arround the app
+///
+pub struct State {
+	pub db_manager: RwLock<DbManager>,
+	pub logger: RwLock<Logger>,
+}
+
+impl State {
+	pub fn new_shared(db_manager: DbManager, logger: Logger) -> SharedState {
+		let state = State {
+			db_manager: RwLock::new(db_manager),
+			logger: RwLock::new(logger),
+		};
+		Arc::new(state)
+	}
+}
+
+///
+/// safe pointer to the shared state
+///
+pub type SharedState = Arc<State>;
+
+///
+/// error type for now..
+///
+pub type Error = Box<dyn error::Error>;
