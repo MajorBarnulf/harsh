@@ -1,3 +1,5 @@
+#![allow(unused, dead_code)]
+
 type Id = u64;
 
 pub struct User {
