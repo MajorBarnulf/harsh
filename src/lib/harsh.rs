@@ -22,10 +22,10 @@ pub struct Harsh {
 
 impl Harsh {
 	pub fn new(configuration: Configuration) -> Self {
-		let db_manager =
-			DbManager::new(configuration.clone()).expect("failed to open / create the database");
 		let logger = Logger::new(configuration.clone());
-		let shared_state = State::new_shared(db_manager, logger);
+		let db_manager = DbManager::new(configuration.clone(), logger.clone())
+			.expect("failed to open / create database");
+		let shared_state = State::new_shared(db_manager, logger.clone());
 		let http_manager = HttpManager::new(configuration.clone(), shared_state.clone());
 
 		Harsh {
@@ -49,6 +49,7 @@ pub struct State {
 
 impl State {
 	pub fn new_shared(db_manager: DbManager, logger: Logger) -> SharedState {
+		logger.info("initialized shared state");
 		let state = State {
 			db_manager: RwLock::new(db_manager),
 			logger: RwLock::new(logger),

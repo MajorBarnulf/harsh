@@ -1,3 +1,5 @@
+use std::{borrow::Borrow, ops::Deref};
+
 use super::config::Configuration;
 use chrono::prelude::*;
 use colored::Colorize;
@@ -5,6 +7,7 @@ use colored::Colorize;
 ///
 /// configurable structure with methods to log informations in different ways
 ///
+#[derive(Clone)]
 pub struct Logger {
 	//
 }
@@ -15,19 +18,16 @@ impl Logger {
 		Logger {}
 	}
 
-	pub fn info(&self, msg: String) {
-		let tag_section = "[info]".blue();
-		println!("{} {} {}", time_segment(), tag_section, msg);
+	pub fn info<T: Into<String>>(&self, msg: T) {
+		println!("{} {} {}", time_segment(), "[info]".blue(), msg.into());
 	}
 
-	pub fn warn(&self, msg: String) {
-		let tag_section = "[warn]".yellow();
-		println!("{} {} {}", time_segment(), tag_section, msg);
+	pub fn warn<T: Into<String>>(&self, msg: T) {
+		println!("{} {} {}", time_segment(), "[warn]".yellow(), msg.into());
 	}
 
-	pub fn fail(&self, msg: String) {
-		let tag_section = "[fail]".red();
-		println!("{} {} {}", time_segment(), tag_section, msg);
+	pub fn fail<T: Into<String>>(&self, msg: T) {
+		println!("{} {} {}", time_segment(), "[fail]".red(), msg.into());
 	}
 }
 
@@ -36,4 +36,28 @@ fn time_segment() -> String {
 	let now = Local::now();
 	let result = now.format("[%Y.%m.%d-%H:%M:%S]").to_string();
 	result
+}
+
+pub trait Loggable {
+	fn name(&self) -> String;
+
+	fn logger(&self) -> Logger;
+
+	fn info<T: Into<String>>(&self, msg: T) {
+		self.logger().info(self.format_message(msg));
+	}
+
+	fn warn<T: Into<String>>(&self, msg: T) {
+		self.logger().warn(self.format_message(msg));
+	}
+
+	fn fail<T: Into<String>>(&self, msg: T) {
+		self.logger().fail(self.format_message(msg));
+	}
+
+	fn format_message<T: Into<String>>(&self, msg: T) -> String {
+		let message: String = msg.into();
+		let formatted = format!("[{}] {}", self.name(), message);
+		formatted
+	}
 }

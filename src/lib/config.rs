@@ -47,7 +47,7 @@ impl Configuration {
 
 	fn write_config(data: &Self) {
 		let serialized = ron::to_string(data).unwrap();
-		write(CONFIG_PATHS[0], serialized);
+		write(CONFIG_PATHS[0], serialized).unwrap_or_else(|_| ());
 	}
 }
 
