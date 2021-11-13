@@ -11,5 +11,7 @@ pub fn setup_routes(app: Router) -> Router {
 }
 
 async fn create_user(Extension(state): Extension<SharedState>, Json(payload): Json<CreateUser>) {
-	//
+	// TODO: security check
+
+	//state.db_manager.;
 }

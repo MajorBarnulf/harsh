@@ -1,20 +1,31 @@
 #![allow(unused, dead_code)]
 
-type Id = u64;
+use serde::{Deserialize, Serialize};
 
+pub type Id = u64;
+
+pub enum Prefixes {
+	Message = 0,
+	User = 10,
+	Channel = 20,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct User {
-	username: String,
-	password: String,
-	id: Id,
+	pub username: String,
+	pub password: String,
+	pub id: Id,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Channel {
-	name: String,
-	id: Id,
-	messages: Vec<Id>,
+	pub name: String,
+	pub id: Id,
+	pub messages: Vec<Id>,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Message {
-	content: String,
-	id: Id,
+	pub content: String,
+	pub id: Id,
 }

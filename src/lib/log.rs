@@ -1,5 +1,3 @@
-use std::{borrow::Borrow, ops::Deref};
-
 use super::config::Configuration;
 use chrono::prelude::*;
 use colored::Colorize;
