@@ -1,0 +1,17 @@
+[package]
+name = "harsh_server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+#sleded = "1.0"
+sled = "0.34"
+telecomande = "1.2"
+tokio = { version = "1.20", features = ["full"] }
+harsh_common = { path = "../harsh-common/" }
+chrono = "0.4"
+rand = "0.8.5"
