@@ -135,7 +135,7 @@ impl StorageProc {
             StorageCmd::ChannelSetName(id, name) => {
                 self.on_channel_set_name(id, name);
             }
-            // ChannelGetParent
+            // ChannelGetParent / Set
 
             //
             StorageCmd::MessageList(channel_id, sender) => {
@@ -154,36 +154,6 @@ impl StorageProc {
                 self.on_message_set_content(channel_id, id, content);
             }
         };
-    }
-
-    fn on_message_set_content(&mut self, channel_id: Id, id: Id, content: String) {
-        let path = format!("/messages/{channel_id}/{id}");
-        if let Some(mut message) = self.get::<_, Message>(&path) {
-            message.set_content(content);
-            self.set(path, message);
-        }
-    }
-
-    fn on_message_get_content(&mut self, channel_id: Id, id: Id, sender: Sender<Option<String>>) {
-        let message = self.get::<_, Message>(format!("/messages/{channel_id}/{id}"));
-        let content = message.map(|m| m.get_content().to_string());
-        sender.send(content).unwrap()
-    }
-
-    fn on_message_delete(&mut self, channel_id: Id, id: Id) {
-        self.remove(format!("/messages/{channel_id}/{id}"));
-    }
-
-    fn on_message_create(&mut self, channel_id: Id, content: String, sender: Sender<Id>) {
-        let message = Message::new(content);
-        let id = message.get_id();
-        self.set(format!("/messages/{channel_id}/{id}"), message);
-        sender.send(id).unwrap();
-    }
-
-    fn on_message_list(&mut self, channel_id: Id, sender: Sender<Vec<Id>>) {
-        let items = self.list(format!("/messages/{channel_id}/"));
-        sender.send(items).unwrap();
     }
 
     //
@@ -222,6 +192,36 @@ impl StorageProc {
     //
     // Messages
     //
+
+    fn on_message_list(&mut self, channel_id: Id, sender: Sender<Vec<Id>>) {
+        let items = self.list(format!("/messages/{channel_id}/"));
+        sender.send(items).unwrap();
+    }
+
+    fn on_message_create(&mut self, channel_id: Id, content: String, sender: Sender<Id>) {
+        let message = Message::new(content);
+        let id = message.get_id();
+        self.set(format!("/messages/{channel_id}/{id}"), message);
+        sender.send(id).unwrap();
+    }
+
+    fn on_message_delete(&mut self, channel_id: Id, id: Id) {
+        self.remove(format!("/messages/{channel_id}/{id}"));
+    }
+
+    fn on_message_get_content(&mut self, channel_id: Id, id: Id, sender: Sender<Option<String>>) {
+        let message = self.get::<_, Message>(format!("/messages/{channel_id}/{id}"));
+        let content = message.map(|m| m.get_content().to_string());
+        sender.send(content).unwrap()
+    }
+
+    fn on_message_set_content(&mut self, channel_id: Id, id: Id, content: String) {
+        let path = format!("/messages/{channel_id}/{id}");
+        if let Some(mut message) = self.get::<_, Message>(&path) {
+            message.set_content(content);
+            self.set(path, message);
+        }
+    }
 }
 
 #[telecomande::async_trait]

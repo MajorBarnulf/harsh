@@ -95,12 +95,8 @@ async fn session(address: Addr, reader: OwnedReadHalf, remote: Remote<gateway::G
     loop {
         let mut line = String::new();
         match reader.read_line(&mut line).await {
-            Err(error) => {
-                eprintln!("[session/error] {error}");
-            }
-            Ok(0) => {
-                break;
-            }
+            Err(error) => eprintln!("[session/error] {error}"),
+            Ok(0) => break,
             _ => (),
         }
         remote

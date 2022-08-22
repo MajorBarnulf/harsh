@@ -42,40 +42,21 @@ impl GatewayProc {
             }
 
             ClientRequest::MessageList(client::MessageList { channel_id }) => {
-                let (cmd, rec) = StorageCmd::new_message_list(channel_id.into());
-                self.storage.send(cmd).unwrap();
-                let messages = rec.await.unwrap().iter().map(Id::to_u64).collect();
-                let request = ServerRequest::new_message_list(channel_id, messages);
-                let command = SessionCmd::new_send(address, request);
-                self.sessions.send(command).unwrap();
+                self.on_message_list(channel_id, address).await;
             }
             ClientRequest::MessageCreate(client::MessageCreate {
                 channel_id,
                 content,
             }) => {
-                let (cmd, rec) = StorageCmd::new_message_create(channel_id.into(), content.clone());
-                self.storage.send(cmd).unwrap();
-                let id = rec.await.unwrap();
-                let request = ServerRequest::new_message_create(channel_id, id.to_u64(), content);
-                let command = SessionCmd::new_broadcast(request);
-                self.sessions.send(command).unwrap();
+                self.on_message_create(channel_id, content).await;
             }
 
             ClientRequest::MessageDelete(client::MessageDelete { id, channel_id }) => {
-                let command = StorageCmd::new_message_delete(channel_id.into(), id.into());
-                self.storage.send(command).unwrap();
-                let request = ServerRequest::new_message_delete(channel_id, id);
-                let command = SessionCmd::new_broadcast(request);
-                self.sessions.send(command).unwrap();
+                self.on_message_delete(channel_id, id);
             }
 
             ClientRequest::MessageGetContent(client::MessageGetContent { id, channel_id }) => {
-                let (cmd, rec) = StorageCmd::new_message_get_content(channel_id.into(), id.into());
-                self.storage.send(cmd).unwrap();
-                let request =
-                    ServerRequest::new_message_get_content(channel_id, id, rec.await.unwrap());
-                let command = SessionCmd::new_send(address, request);
-                self.sessions.send(command).unwrap();
+                self.on_message_get_content(channel_id, id, address).await;
             }
 
             ClientRequest::MessageSetContent(client::MessageSetContent {
@@ -83,15 +64,7 @@ impl GatewayProc {
                 id,
                 channel_id,
             }) => {
-                let command = StorageCmd::new_message_set_content(
-                    channel_id.into(),
-                    id.into(),
-                    content.clone(),
-                );
-                self.storage.send(command).unwrap();
-                let request = ServerRequest::new_message_set_content(channel_id, id, content);
-                let command = SessionCmd::new_broadcast(request);
-                self.sessions.send(command).unwrap();
+                self.on_message_set_content(channel_id, id, content);
             }
         }
     }
@@ -146,6 +119,49 @@ impl GatewayProc {
         let command = StorageCmd::new_channel_set_name(id.into(), name.clone());
         self.storage.send(command).unwrap();
         let request = ServerRequest::new_channel_set_name(id, name);
+        let command = SessionCmd::new_broadcast(request);
+        self.sessions.send(command).unwrap();
+    }
+
+    async fn on_message_list(&mut self, channel_id: u64, address: Addr) {
+        let (cmd, rec) = StorageCmd::new_message_list(channel_id.into());
+        self.storage.send(cmd).unwrap();
+        let messages = rec.await.unwrap().iter().map(Id::to_u64).collect();
+        let request = ServerRequest::new_message_list(channel_id, messages);
+        let command = SessionCmd::new_send(address, request);
+        self.sessions.send(command).unwrap();
+    }
+
+    async fn on_message_create(&mut self, channel_id: u64, content: String) {
+        let (cmd, rec) = StorageCmd::new_message_create(channel_id.into(), content.clone());
+        self.storage.send(cmd).unwrap();
+        let id = rec.await.unwrap();
+        let request = ServerRequest::new_message_create(channel_id, id.to_u64(), content);
+        let command = SessionCmd::new_broadcast(request);
+        self.sessions.send(command).unwrap();
+    }
+
+    fn on_message_delete(&mut self, channel_id: u64, id: u64) {
+        let command = StorageCmd::new_message_delete(channel_id.into(), id.into());
+        self.storage.send(command).unwrap();
+        let request = ServerRequest::new_message_delete(channel_id, id);
+        let command = SessionCmd::new_broadcast(request);
+        self.sessions.send(command).unwrap();
+    }
+
+    async fn on_message_get_content(&mut self, channel_id: u64, id: u64, address: Addr) {
+        let (cmd, rec) = StorageCmd::new_message_get_content(channel_id.into(), id.into());
+        self.storage.send(cmd).unwrap();
+        let request = ServerRequest::new_message_get_content(channel_id, id, rec.await.unwrap());
+        let command = SessionCmd::new_send(address, request);
+        self.sessions.send(command).unwrap();
+    }
+
+    fn on_message_set_content(&mut self, channel_id: u64, id: u64, content: String) {
+        let command =
+            StorageCmd::new_message_set_content(channel_id.into(), id.into(), content.clone());
+        self.storage.send(command).unwrap();
+        let request = ServerRequest::new_message_set_content(channel_id, id, content);
         let command = SessionCmd::new_broadcast(request);
         self.sessions.send(command).unwrap();
     }
