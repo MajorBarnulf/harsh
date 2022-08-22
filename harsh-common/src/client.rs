@@ -54,6 +54,42 @@ pub struct MessageSetContent {
 }
 
 #[derive(Debug)]
+pub struct UserList {}
+
+#[derive(Debug)]
+pub struct UserCreate {
+    pub name: String,
+    pub pass: String,
+}
+
+#[derive(Debug)]
+pub struct UserDelete {
+    pub id: u64,
+}
+
+#[derive(Debug)]
+pub struct UserGetName {
+    pub id: u64,
+}
+
+#[derive(Debug)]
+pub struct UserSetName {
+    pub id: u64,
+    pub name: String,
+}
+
+#[derive(Debug)]
+pub struct UserGetPass {
+    pub id: u64,
+}
+
+#[derive(Debug)]
+pub struct UserSetPass {
+    pub id: u64,
+    pub pass: String,
+}
+
+#[derive(Debug)]
 pub enum ClientRequest {
     Ping(Ping),
     ChannelList(ChannelList),
@@ -61,11 +97,19 @@ pub enum ClientRequest {
     ChannelDelete(ChannelDelete),
     ChannelGetName(ChannelGetName),
     ChannelSetName(ChannelSetName),
+
     MessageList(MessageList),
     MessageCreate(MessageCreate),
     MessageDelete(MessageDelete),
     MessageGetContent(MessageGetContent),
     MessageSetContent(MessageSetContent),
+
+    UserList(UserList),
+    UserCreate(UserCreate),
+    UserDelete(UserDelete),
+    UserGetName(UserGetName),
+    UserSetName(UserSetName),
+    UserSetPass(UserSetPass),
 }
 
 impl ClientRequest {
@@ -162,6 +206,12 @@ impl ClientRequest {
                 id,
                 channel_id,
             }),
+            user_list {} => Self::UserList(UserList {}),
+            user_create { name, pass } => Self::UserCreate(UserCreate { name, pass }),
+            user_delete { id } => Self::UserDelete(UserDelete { id }),
+            user_get_name { id } => Self::UserGetName(UserGetName { id }),
+            user_set_name { id, name } => Self::UserSetName(UserSetName { id, name }),
+            user_set_pass { id, pass } => Self::UserSetPass(UserSetPass { id, pass }),
         };
         Some(mapped)
     }
@@ -208,6 +258,12 @@ impl ClientRequest {
                 channel_id,
                 content,
             },
+            Self::UserList(UserList {}) => user_list {},
+            Self::UserCreate(UserCreate { name, pass }) => user_create { name, pass },
+            Self::UserDelete(UserDelete { id }) => user_delete { id },
+            Self::UserGetName(UserGetName { id }) => user_get_name { id },
+            Self::UserSetName(UserSetName { id, name }) => user_set_name { id, name },
+            Self::UserSetPass(UserSetPass { id, pass }) => user_set_pass { id, pass },
         };
         serde_json::to_string(&mapped).unwrap()
     }
@@ -257,6 +313,25 @@ mod repr {
             channel_id: u64,
             id: u64,
             content: String,
+        },
+        user_list {},
+        user_create {
+            name: String,
+            pass: String,
+        },
+        user_delete {
+            id: u64,
+        },
+        user_get_name {
+            id: u64,
+        },
+        user_set_name {
+            id: u64,
+            name: String,
+        },
+        user_set_pass {
+            id: u64,
+            pass: String,
         },
     }
 }

@@ -32,6 +32,34 @@ impl Channel {
 pub struct User {
     id: Id,
     name: String,
+    pass: String,
+}
+
+impl User {
+    pub fn new(name: String, pass: String) -> Self {
+        let id = Id::from_now();
+        Self { id, name, pass }
+    }
+
+    pub fn get_id(&self) -> Id {
+        self.id
+    }
+
+    pub fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn set_name(&mut self, name: String) {
+        self.name = name
+    }
+
+    pub fn get_pass(&self) -> &str {
+        &self.pass
+    }
+
+    pub fn set_pass(&mut self, pass: String) {
+        self.pass = pass
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

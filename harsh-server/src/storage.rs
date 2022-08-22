@@ -16,6 +16,13 @@ pub enum StorageCmd {
     MessageDelete(Id, Id),
     MessageGetContent(Id, Id, Sender<Option<String>>),
     MessageSetContent(Id, Id, String),
+    UserList(Sender<Vec<Id>>),
+    UserCreate(String, String, Sender<Id>),
+    UserDelete(Id),
+    UserGetName(Id, Sender<Option<String>>),
+    UserSetName(Id, String),
+    UserGetPass(Id, Sender<Option<String>>),
+    UserSetPass(Id, String),
 }
 
 impl StorageCmd {
@@ -121,37 +128,77 @@ impl StorageProc {
     }
 
     async fn handle_command(&mut self, command: StorageCmd) {
+        use StorageCmd::*;
         match command {
-            StorageCmd::ChannelList(sender) => {
-                self.on_channel_list(sender);
-            }
-            StorageCmd::ChannelCreate(name, sender) => {
-                self.on_channel_create(name, sender);
-            }
-            StorageCmd::ChannelDelete(id) => self.on_channel_remove(id),
-            StorageCmd::ChannelGetName(id, sender) => {
-                self.on_channel_get_name(id, sender);
-            }
-            StorageCmd::ChannelSetName(id, name) => {
-                self.on_channel_set_name(id, name);
-            }
+            //
+            // Channel
+            //
+            ChannelList(sender) => self.on_channel_list(sender),
+            ChannelCreate(name, sender) => self.on_channel_create(name, sender),
+            ChannelDelete(id) => self.on_channel_remove(id),
+            ChannelGetName(id, sender) => self.on_channel_get_name(id, sender),
+            ChannelSetName(id, name) => self.on_channel_set_name(id, name),
             // ChannelGetParent / Set
 
             //
-            StorageCmd::MessageList(channel_id, sender) => {
-                self.on_message_list(channel_id, sender);
+            // User
+            //
+            MessageList(channel_id, sender) => self.on_message_list(channel_id, sender),
+            MessageCreate(channel_id, content, sender) => {
+                self.on_message_create(channel_id, content, sender)
             }
-            StorageCmd::MessageCreate(channel_id, content, sender) => {
-                self.on_message_create(channel_id, content, sender);
+            MessageDelete(channel_id, id) => self.on_message_delete(channel_id, id),
+            MessageGetContent(channel_id, id, sender) => {
+                self.on_message_get_content(channel_id, id, sender)
             }
-            StorageCmd::MessageDelete(channel_id, id) => {
-                self.on_message_delete(channel_id, id);
+            MessageSetContent(channel_id, id, content) => {
+                self.on_message_set_content(channel_id, id, content)
             }
-            StorageCmd::MessageGetContent(channel_id, id, sender) => {
-                self.on_message_get_content(channel_id, id, sender);
+
+            //
+            // User
+            //
+            UserList(sender) => {
+                let users = self.list("/users/");
+                sender.send(users).unwrap();
             }
-            StorageCmd::MessageSetContent(channel_id, id, content) => {
-                self.on_message_set_content(channel_id, id, content);
+
+            UserCreate(name, pass, sender) => {
+                let user = User::new(name, pass);
+                let id = user.get_id();
+                sender.send(id).unwrap();
+            }
+
+            UserDelete(id) => {
+                self.remove(format!("/users/{id}"));
+            }
+
+            UserGetName(id, sender) => {
+                let user = self.get::<_, User>(format!("/users/{id}"));
+                let name = user.map(|u| u.get_name().to_string());
+                sender.send(name).unwrap();
+            }
+
+            UserSetName(id, name) => {
+                let path = format!("/users/{id}");
+                if let Some(mut user) = self.get::<_, User>(&path) {
+                    user.set_name(name);
+                    self.set(path, user);
+                }
+            }
+
+            UserGetPass(id, sender) => {
+                let user = self.get::<_, User>(format!("/users/{id}"));
+                let name = user.map(|u| u.get_pass().to_string());
+                sender.send(name).unwrap();
+            }
+
+            UserSetPass(id, pass) => {
+                let path = format!("/users/{id}");
+                if let Some(mut user) = self.get::<_, User>(&path) {
+                    user.set_pass(pass);
+                    self.set(path, user);
+                }
             }
         };
     }
@@ -192,7 +239,6 @@ impl StorageProc {
     //
     // Messages
     //
-
     fn on_message_list(&mut self, channel_id: Id, sender: Sender<Vec<Id>>) {
         let items = self.list(format!("/messages/{channel_id}/"));
         sender.send(items).unwrap();

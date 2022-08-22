@@ -16,55 +16,57 @@ pub struct GatewayProc {
 
 impl GatewayProc {
     async fn handle_request(&mut self, address: Addr, request: ClientRequest) {
+        use client as c;
+        use ClientRequest::*;
         match request {
-            ClientRequest::Ping(client::Ping { content }) => {
-                self.on_ping(content, address);
-            }
+            Ping(c::Ping { content }) => self.on_ping(content, address),
 
-            ClientRequest::ChannelCreate(client::ChannelCreate { name }) => {
-                self.on_channel_create(name).await;
-            }
+            ChannelCreate(c::ChannelCreate { name }) => self.on_channel_create(name).await,
+            ChannelDelete(c::ChannelDelete { id }) => self.on_channel_delete(id),
+            ChannelList(c::ChannelList {}) => self.on_channel_list(address).await,
+            ChannelGetName(c::ChannelGetName { id }) => self.on_channel_get_name(id, address).await,
+            ChannelSetName(c::ChannelSetName { id, name }) => self.on_channel_set_name(id, name),
 
-            ClientRequest::ChannelDelete(client::ChannelDelete { id }) => {
-                self.on_channel_delete(id);
+            MessageList(c::MessageList { channel_id }) => {
+                self.on_message_list(channel_id, address).await
             }
-
-            ClientRequest::ChannelList(client::ChannelList {}) => {
-                self.on_channel_list(address).await;
-            }
-
-            ClientRequest::ChannelGetName(client::ChannelGetName { id }) => {
-                self.on_channel_get_name(id, address).await;
-            }
-
-            ClientRequest::ChannelSetName(client::ChannelSetName { id, name }) => {
-                self.on_channel_set_name(id, name);
-            }
-
-            ClientRequest::MessageList(client::MessageList { channel_id }) => {
-                self.on_message_list(channel_id, address).await;
-            }
-            ClientRequest::MessageCreate(client::MessageCreate {
+            MessageCreate(c::MessageCreate {
                 channel_id,
                 content,
-            }) => {
-                self.on_message_create(channel_id, content).await;
+            }) => self.on_message_create(channel_id, content).await,
+            MessageDelete(c::MessageDelete { channel_id, id }) => {
+                self.on_message_delete(channel_id, id)
+            }
+            MessageGetContent(c::MessageGetContent { channel_id, id }) => {
+                self.on_message_get_content(channel_id, id, address).await
             }
 
-            ClientRequest::MessageDelete(client::MessageDelete { id, channel_id }) => {
-                self.on_message_delete(channel_id, id);
-            }
-
-            ClientRequest::MessageGetContent(client::MessageGetContent { id, channel_id }) => {
-                self.on_message_get_content(channel_id, id, address).await;
-            }
-
-            ClientRequest::MessageSetContent(client::MessageSetContent {
-                content,
+            MessageSetContent(c::MessageSetContent {
+                channel_id,
                 id,
-                channel_id,
+                content,
             }) => {
                 self.on_message_set_content(channel_id, id, content);
+            }
+
+            // TODO: user
+            UserList(c::UserList {}) => {
+                todo!()
+            }
+            UserCreate(c::UserCreate { name, pass }) => {
+                todo!()
+            }
+            UserDelete(c::UserDelete { id }) => {
+                todo!()
+            }
+            UserGetName(c::UserGetName { id }) => {
+                todo!()
+            }
+            UserSetName(c::UserSetName { id, name }) => {
+                todo!()
+            }
+            UserSetPass(c::UserSetPass { id, pass }) => {
+                todo!()
             }
         }
     }
