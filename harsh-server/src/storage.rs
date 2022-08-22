@@ -202,6 +202,7 @@ impl StorageProc {
             UserCreate(name, pass, sender) => {
                 let user = User::new(name, pass);
                 let id = user.get_id();
+                self.set(format!("/users/{id}"), user);
                 sender.send(id).unwrap();
             }
 
