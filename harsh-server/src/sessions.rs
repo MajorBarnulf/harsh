@@ -1,5 +1,6 @@
 use std::{collections::HashMap, net::SocketAddr};
 
+use harsh_common::ServerRequest;
 use telecomande::{Processor, Remote};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
@@ -16,6 +17,13 @@ pub enum SessionCmd {
     AddSession(TcpStream, SocketAddr, Remote<gateway::GatewayProc>),
     RemoveSession(Addr),
     Send(Addr, String),
+}
+
+impl SessionCmd {
+    pub fn new_send(address: Addr, request: ServerRequest) -> Self {
+        let content = request.serialize();
+        Self::Send(address, content)
+    }
 }
 
 #[derive(Debug, Default)]
@@ -69,7 +77,7 @@ async fn session(address: Addr, reader: OwnedReadHalf, remote: Remote<gateway::G
     loop {
         let mut line = String::new();
         if let Err(error) = reader.read_line(&mut line).await {
-            eprintln!("{error}");
+            eprintln!("[session/error] {error}");
             break;
         }
         remote

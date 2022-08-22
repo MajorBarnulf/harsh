@@ -1,9 +1,19 @@
-pub enum ServerRequest {
-    Pong(Pong),
-}
-
 pub struct Pong {
     pub content: String,
+}
+
+pub struct ChannelList {
+    pub channels: Vec<u64>,
+}
+
+pub struct ChannelGetName {
+    pub id: u64,
+    pub name: Option<String>,
+}
+pub enum ServerRequest {
+    Pong(Pong),
+    ChannelList(ChannelList),
+    ChannelGetName(ChannelGetName),
 }
 
 impl ServerRequest {
@@ -11,17 +21,31 @@ impl ServerRequest {
         Self::Pong(Pong { content })
     }
 
+    pub fn new_channel_list(channels: Vec<u64>) -> Self {
+        Self::ChannelList(ChannelList { channels })
+    }
+
+    pub fn new_channel_get_name(id: u64, name: Option<String>) -> Self {
+        Self::ChannelGetName(ChannelGetName { name, id })
+    }
+
     pub fn try_parse(line: &str) -> Option<Self> {
+        use repr::Command::*;
         let command: repr::Command = serde_json::from_str(line).ok()?;
         let mapped = match command {
-            repr::Command::pong { content } => Self::Pong(Pong { content }),
+            pong { content } => Self::Pong(Pong { content }),
+            channel_list { channels } => Self::ChannelList(ChannelList { channels }),
+            channel_get_name { id, name } => Self::ChannelGetName(ChannelGetName { id, name }),
         };
         Some(mapped)
     }
 
     pub fn serialize(self) -> String {
+        use repr::Command::*;
         let mapped = match self {
-            Self::Pong(Pong { content }) => repr::Command::pong { content },
+            Self::Pong(Pong { content }) => pong { content },
+            Self::ChannelList(ChannelList { channels }) => channel_list { channels },
+            Self::ChannelGetName(ChannelGetName { id, name }) => channel_get_name { id, name },
         };
         serde_json::to_string(&mapped).unwrap()
     }
@@ -36,5 +60,7 @@ mod repr {
     #[serde(tag = "type")]
     pub enum Command {
         pong { content: String },
+        channel_list { channels: Vec<u64> },
+        channel_get_name { id: u64, name: Option<String> },
     }
 }

@@ -27,6 +27,14 @@ impl Id {
         let inner: u64 = input.parse().ok()?;
         Some(Self(inner))
     }
+
+    pub fn from_u64(input: u64) -> Self {
+        Self(input)
+    }
+
+    pub fn to_u64(&self) -> u64 {
+        self.0
+    }
 }
 
 #[test]

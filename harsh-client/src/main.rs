@@ -1,6 +1,9 @@
+use std::time::Duration;
+
 use tokio::{
     io::{stdin, AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::TcpStream,
+    time,
 };
 
 #[tokio::main]
@@ -15,6 +18,7 @@ async fn main() {
             let mut line = String::new();
             reader.read_line(&mut line).await.unwrap();
             println!("received '{line}'");
+            time::sleep(Duration::from_millis(100)).await;
         }
     });
 
@@ -43,10 +47,11 @@ async fn main() {
 }
 
 mod commands {
+    use harsh_common::ClientRequest;
 
     pub enum Command {
         Help,
-        Request(harsh_common::ClientRequest),
+        Request(ClientRequest),
     }
 
     pub fn parse(input: &str) -> Option<Command> {
@@ -56,13 +61,40 @@ mod commands {
             "ping" => {
                 let rest = parts.collect::<Box<[_]>>();
                 let content = rest.join(" ");
-                harsh_common::ClientRequest::new_ping(content)
+                ClientRequest::new_ping(content)
+            }
+            "chanls" => ClientRequest::new_channel_list(),
+            "chanadd" => {
+                let name = parts.next()?;
+                ClientRequest::new_channel_create(name)
+            }
+            "chandel" => {
+                let id = parts.next()?.parse().ok()?;
+                ClientRequest::new_channel_delete(id)
+            }
+            "changetname" => {
+                let id = parts.next()?.parse().ok()?;
+                ClientRequest::new_channel_get_name(id)
             }
             _ => return None,
         };
 
         Some(Command::Request(command))
     }
+
+    pub const CMDS: &'static [Description] = &[
+        // all commands
+        Description::new("help", &[], "returns a help message"),
+        Description::new(
+            "ping",
+            &["content"],
+            "sends a ping with the specified content",
+        ),
+        Description::new("chanls", &[], "list channels"),
+        Description::new("chanadd", &["name"], "creates a new channel"),
+        Description::new("chandel", &["id"], "delete a channel by its id"),
+        Description::new("changetname", &["id"], "get a channel's name"),
+    ];
 
     pub fn smart_split(input: &str) -> Vec<String> {
         let input = input.trim();
@@ -131,20 +163,10 @@ mod commands {
         ) -> Self {
             Self { name, desc, params }
         }
-
-        pub const ALL: &'static [Self] = &[
-            // all commands
-            Self::new("help", &[], "returns a help message"),
-            Self::new(
-                "ping",
-                &["content"],
-                "sends a ping with the specified content",
-            ),
-        ];
     }
 
     pub fn help() {
-        for &Description { name, params, desc } in Description::ALL {
+        for &Description { name, params, desc } in CMDS {
             let mut usage = params.iter().map(|s| s.to_string()).collect::<Vec<_>>();
             usage.insert(0, name.to_string());
             let usage = usage.join(" ");

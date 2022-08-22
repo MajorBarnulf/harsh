@@ -7,8 +7,8 @@ mod tests {
     }
 }
 
-pub use client::{ClientRequest, Ping};
-mod client;
+pub use client::ClientRequest;
+pub mod client;
 
-pub use server::{Pong, ServerRequest};
-mod server;
+pub use server::ServerRequest;
+pub mod server;

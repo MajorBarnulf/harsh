@@ -1,9 +1,7 @@
-use harsh_common::{Ping, Pong, ServerRequest};
+use harsh_common::{client, server, ClientRequest, ServerRequest};
 use telecomande::{Processor, Remote};
 
-use harsh_common::ClientRequest;
-
-use crate::{sessions, Addr, SessionProc, StorageProc};
+use crate::{Addr, Id, SessionCmd, SessionProc, StorageCmd, StorageProc};
 
 #[derive(Debug)]
 pub enum GatewayCmd {
@@ -12,26 +10,50 @@ pub enum GatewayCmd {
 }
 
 pub struct GatewayProc {
-    client_handler: Remote<SessionProc>,
+    sessions: Remote<SessionProc>,
     storage: Remote<StorageProc>,
 }
 
 impl GatewayProc {
-    pub fn new(client_handler: Remote<SessionProc>, storage: Remote<StorageProc>) -> Self {
-        Self {
-            client_handler,
-            storage,
-        }
+    pub fn new(sessions: Remote<SessionProc>, storage: Remote<StorageProc>) -> Self {
+        Self { sessions, storage }
     }
 
     async fn handle_request(&mut self, address: Addr, request: ClientRequest) {
         match request {
-            ClientRequest::Ping(Ping { content }) => {
+            ClientRequest::Ping(client::Ping { content }) => {
                 println!("received ping! '{content:?}'");
-                let response = ServerRequest::Pong(Pong { content });
-                let content = response.serialize();
-                self.client_handler
-                    .send(sessions::SessionCmd::Send(address, content))
+                let request = ServerRequest::Pong(server::Pong { content });
+                self.sessions
+                    .send(SessionCmd::new_send(address, request))
+                    .unwrap();
+            }
+            ClientRequest::ChannelList(client::ChannelList {}) => {
+                let (cmd, rec) = StorageCmd::new_channel_list();
+                self.storage.send(cmd).unwrap();
+                let channels = rec.await.unwrap().iter().map(|id| id.to_u64()).collect();
+                let request = ServerRequest::new_channel_list(channels);
+                self.sessions
+                    .send(SessionCmd::new_send(address, request))
+                    .unwrap();
+            }
+            ClientRequest::ChannelCreate(client::ChannelCreate { name }) => {
+                let (cmd, rec) = StorageCmd::new_channel_create(name);
+                let _id = rec.await.unwrap();
+                self.storage.send(cmd).unwrap();
+            }
+            ClientRequest::ChannelDelete(client::ChannelDelete { channel_id }) => {
+                self.storage
+                    .send(StorageCmd::ChannelDelete(Id::from_u64(channel_id)))
+                    .unwrap();
+            }
+            ClientRequest::ChannelGetName(client::ChannelGetName { channel_id }) => {
+                let (cmd, rec) = StorageCmd::new_channel_get_name(Id::from_u64(channel_id));
+                self.storage.send(cmd).unwrap();
+                let name = rec.await.unwrap();
+                let request = ServerRequest::new_channel_get_name(channel_id, name);
+                self.sessions
+                    .send(SessionCmd::new_send(address, request))
                     .unwrap();
             }
         }
@@ -46,14 +68,15 @@ impl Processor for GatewayProc {
         match command {
             GatewayCmd::Request(address, request) => {
                 if let Some(request) = ClientRequest::try_parse(&request) {
+                    println!("[session/info] received command '{request:?}'");
                     self.handle_request(address, request).await;
                 } else {
-                    println!("failed to parse command");
+                    println!("[session/warn] failed to parse command");
                 }
             }
             GatewayCmd::ClosedConnection(address) => self
-                .client_handler
-                .send(sessions::SessionCmd::RemoveSession(address))
+                .sessions
+                .send(SessionCmd::RemoveSession(address))
                 .unwrap(),
         }
         Ok(())

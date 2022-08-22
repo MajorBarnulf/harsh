@@ -8,23 +8,23 @@ use crate::Id;
 pub enum StorageCmd {
     ChannelCreate(String, Sender<Id>),
     ChannelDelete(Id),
-    ChannelGetAll(Sender<Vec<Id>>),
+    ChannelList(Sender<Vec<Id>>),
     ChannelGetName(Id, Sender<Option<String>>),
 }
 
 impl StorageCmd {
-    fn new_channel_create(name: impl ToString) -> (Self, Receiver<Id>) {
+    pub fn new_channel_create(name: impl ToString) -> (Self, Receiver<Id>) {
         let (s, r) = oneshot::channel();
         (Self::ChannelCreate(name.to_string(), s), r)
     }
-    fn new_channel_delete(id: Id) -> Self {
+    pub fn new_channel_delete(id: Id) -> Self {
         Self::ChannelDelete(id)
     }
-    fn new_channel_get_all() -> (Self, Receiver<Vec<Id>>) {
+    pub fn new_channel_list() -> (Self, Receiver<Vec<Id>>) {
         let (s, r) = oneshot::channel();
-        (Self::ChannelGetAll(s), r)
+        (Self::ChannelList(s), r)
     }
-    fn new_channel_get_name(id: Id) -> (Self, Receiver<Option<String>>) {
+    pub fn new_channel_get_name(id: Id) -> (Self, Receiver<Option<String>>) {
         let (s, r) = oneshot::channel();
         (Self::ChannelGetName(id, s), r)
     }
@@ -93,7 +93,7 @@ impl Processor for StorageProc {
                 self.set(format!("/channels/{id}"), item);
                 sender.send(id).unwrap();
             }
-            StorageCmd::ChannelGetAll(sender) => {
+            StorageCmd::ChannelList(sender) => {
                 let results = self.list("/channels/");
                 sender.send(results).unwrap();
             }
@@ -170,7 +170,7 @@ async fn test_channels() {
     let id = rec.await.unwrap();
 
     // query all
-    let (cmd, rec) = StorageCmd::new_channel_get_all();
+    let (cmd, rec) = StorageCmd::new_channel_list();
     remote.send(cmd).unwrap();
     let result = rec.await.unwrap();
     assert_eq!(result.len(), 1);
@@ -189,7 +189,7 @@ async fn test_channels() {
     let id2 = rec.await.unwrap();
 
     // query all
-    let (cmd, rec) = StorageCmd::new_channel_get_all();
+    let (cmd, rec) = StorageCmd::new_channel_list();
     remote.send(cmd).unwrap();
     let result = rec.await.unwrap();
     assert_eq!(result.len(), 2);
