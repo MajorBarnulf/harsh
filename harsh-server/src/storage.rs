@@ -219,6 +219,9 @@ impl StorageProc {
     }
 
     fn on_channel_remove(&mut self, id: Id) {
+        for message_id in self.list(format!("/messages/{id}/")) {
+            self.remove(format!("/messages/{id}/{message_id}"))
+        }
         self.remove(format!("/channels/{id}"))
     }
 
