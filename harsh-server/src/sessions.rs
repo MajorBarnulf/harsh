@@ -17,12 +17,18 @@ pub enum SessionCmd {
     AddSession(TcpStream, SocketAddr, Remote<gateway::GatewayProc>),
     RemoveSession(Addr),
     Send(Addr, String),
+    Broadcast(String),
 }
 
 impl SessionCmd {
     pub fn new_send(address: Addr, request: ServerRequest) -> Self {
         let content = request.serialize();
         Self::Send(address, content)
+    }
+
+    pub fn new_broadcast(request: ServerRequest) -> Self {
+        let content = request.serialize();
+        Self::Broadcast(content)
     }
 }
 
@@ -53,18 +59,30 @@ impl Processor for SessionProc {
     async fn handle(&mut self, command: Self::Command) -> Result<(), Self::Error> {
         match command {
             SessionCmd::AddSession(stream, address, remote) => {
+                println!("[sessions/info] new connection from '{address:?}'");
                 let address = Addr::new(address);
                 self.add_client(stream, address, remote)
             }
             SessionCmd::RemoveSession(address) => {
-                self.clients.remove(&address);
+                println!("[sessions/info] closed connection from '{address:?}'");
+                if let Some((_writer, handle)) = self.clients.remove(&address) {
+                    handle.await.unwrap();
+                }
             }
             SessionCmd::Send(address, content) => {
                 if let Some((client, _)) = self.clients.get_mut(&address) {
+                    println!("[session/info] sending '{content}' to '{address:?}'");
                     client.write_all(content.as_bytes()).await.unwrap();
                     client.write_all(b"\n").await.unwrap();
                 } else {
-                    println!("failed to find session with address '{address:?}'")
+                    eprintln!("failed to find session with address '{address:?}'")
+                }
+            }
+            SessionCmd::Broadcast(content) => {
+                for (client, _) in self.clients.values_mut() {
+                    println!("[session/info] broadcasting '{content}'");
+                    client.write_all(content.as_bytes()).await.unwrap();
+                    client.write_all(b"\n").await.unwrap();
                 }
             }
         };
@@ -76,9 +94,14 @@ async fn session(address: Addr, reader: OwnedReadHalf, remote: Remote<gateway::G
     let mut reader = BufReader::new(reader);
     loop {
         let mut line = String::new();
-        if let Err(error) = reader.read_line(&mut line).await {
-            eprintln!("[session/error] {error}");
-            break;
+        match reader.read_line(&mut line).await {
+            Err(error) => {
+                eprintln!("[session/error] {error}");
+            }
+            Ok(0) => {
+                break;
+            }
+            _ => (),
         }
         remote
             .send(gateway::GatewayCmd::Request(address.clone(), line.clone()))

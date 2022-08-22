@@ -6,27 +6,66 @@ use crate::Id;
 
 #[derive(Debug)]
 pub enum StorageCmd {
+    ChannelList(Sender<Vec<Id>>),
     ChannelCreate(String, Sender<Id>),
     ChannelDelete(Id),
-    ChannelList(Sender<Vec<Id>>),
     ChannelGetName(Id, Sender<Option<String>>),
+    ChannelSetName(Id, String),
+    MessageList(Id, Sender<Vec<Id>>),
+    MessageCreate(Id, String, Sender<Id>),
+    MessageDelete(Id, Id),
+    MessageGetContent(Id, Id, Sender<Option<String>>),
+    MessageSetContent(Id, Id, String),
 }
 
 impl StorageCmd {
-    pub fn new_channel_create(name: impl ToString) -> (Self, Receiver<Id>) {
-        let (s, r) = oneshot::channel();
-        (Self::ChannelCreate(name.to_string(), s), r)
-    }
-    pub fn new_channel_delete(id: Id) -> Self {
-        Self::ChannelDelete(id)
-    }
     pub fn new_channel_list() -> (Self, Receiver<Vec<Id>>) {
         let (s, r) = oneshot::channel();
         (Self::ChannelList(s), r)
     }
+
+    pub fn new_channel_create(name: impl ToString) -> (Self, Receiver<Id>) {
+        let (s, r) = oneshot::channel();
+        (Self::ChannelCreate(name.to_string(), s), r)
+    }
+
+    pub fn new_channel_delete(id: Id) -> Self {
+        Self::ChannelDelete(id)
+    }
+
     pub fn new_channel_get_name(id: Id) -> (Self, Receiver<Option<String>>) {
         let (s, r) = oneshot::channel();
         (Self::ChannelGetName(id, s), r)
+    }
+
+    pub fn new_channel_set_name(id: Id, name: String) -> Self {
+        Self::ChannelSetName(id, name)
+    }
+
+    pub fn new_message_list(channel_id: Id) -> (Self, Receiver<Vec<Id>>) {
+        let (sender, receiver) = oneshot::channel();
+        let cmd = Self::MessageList(channel_id, sender);
+        (cmd, receiver)
+    }
+
+    pub fn new_message_create(channel_id: Id, content: String) -> (Self, Receiver<Id>) {
+        let (sender, receiver) = oneshot::channel();
+        let cmd = Self::MessageCreate(channel_id, content, sender);
+        (cmd, receiver)
+    }
+
+    pub fn new_message_delete(channel_id: Id, id: Id) -> Self {
+        Self::MessageDelete(channel_id, id)
+    }
+
+    pub fn new_message_get_content(channel_id: Id, id: Id) -> (Self, Receiver<Option<String>>) {
+        let (sender, receiver) = oneshot::channel();
+        let cmd = Self::MessageGetContent(channel_id, id, sender);
+        (cmd, receiver)
+    }
+
+    pub fn new_message_set_content(channel_id: Id, id: Id, content: String) -> Self {
+        Self::MessageSetContent(channel_id, id, content)
     }
 }
 
@@ -50,6 +89,7 @@ impl StorageProc {
         T: SerDeser,
     {
         let path = path.to_string();
+        println!("[storage/info] setting entry at '{path}'");
         T::read(&self.base, path)
     }
     fn set<S, T>(&self, path: S, item: T)
@@ -58,12 +98,15 @@ impl StorageProc {
         T: SerDeser,
     {
         let path = path.to_string();
+        println!("[storage/info] getting entry at '{path}'");
         item.write(&self.base, path)
     }
 
     fn list(&self, path: impl ToString) -> Vec<Id> {
         let path = path.to_string();
-        list(&self.base, path).collect() // TODO: turn into iterator with limits
+        println!("[storage/info] listing entries in '{path}'");
+        let db = &self.base;
+        list(db, path)
     }
 
     // firsts (x)
@@ -73,8 +116,112 @@ impl StorageProc {
 
     fn remove(&self, path: impl ToString) {
         let path = path.to_string();
-        remove(&self.base, path)
+        println!("[storage/info] removing entry at '{path}'");
+        self.base.remove(path).unwrap();
     }
+
+    async fn handle_command(&mut self, command: StorageCmd) {
+        match command {
+            StorageCmd::ChannelList(sender) => {
+                self.on_channel_list(sender);
+            }
+            StorageCmd::ChannelCreate(name, sender) => {
+                self.on_channel_create(name, sender);
+            }
+            StorageCmd::ChannelDelete(id) => self.on_channel_remove(id),
+            StorageCmd::ChannelGetName(id, sender) => {
+                self.on_channel_get_name(id, sender);
+            }
+            StorageCmd::ChannelSetName(id, name) => {
+                self.on_channel_set_name(id, name);
+            }
+            // ChannelGetParent
+
+            //
+            StorageCmd::MessageList(channel_id, sender) => {
+                self.on_message_list(channel_id, sender);
+            }
+            StorageCmd::MessageCreate(channel_id, content, sender) => {
+                self.on_message_create(channel_id, content, sender);
+            }
+            StorageCmd::MessageDelete(channel_id, id) => {
+                self.on_message_delete(channel_id, id);
+            }
+            StorageCmd::MessageGetContent(channel_id, id, sender) => {
+                self.on_message_get_content(channel_id, id, sender);
+            }
+            StorageCmd::MessageSetContent(channel_id, id, content) => {
+                self.on_message_set_content(channel_id, id, content);
+            }
+        };
+    }
+
+    fn on_message_set_content(&mut self, channel_id: Id, id: Id, content: String) {
+        let path = format!("/messages/{channel_id}/{id}");
+        if let Some(mut message) = self.get::<_, Message>(&path) {
+            message.set_content(content);
+            self.set(path, message);
+        }
+    }
+
+    fn on_message_get_content(&mut self, channel_id: Id, id: Id, sender: Sender<Option<String>>) {
+        let message = self.get::<_, Message>(format!("/messages/{channel_id}/{id}"));
+        let content = message.map(|m| m.get_content().to_string());
+        sender.send(content).unwrap()
+    }
+
+    fn on_message_delete(&mut self, channel_id: Id, id: Id) {
+        self.remove(format!("/messages/{channel_id}/{id}"));
+    }
+
+    fn on_message_create(&mut self, channel_id: Id, content: String, sender: Sender<Id>) {
+        let message = Message::new(content);
+        let id = message.get_id();
+        self.set(format!("/messages/{channel_id}/{id}"), message);
+        sender.send(id).unwrap();
+    }
+
+    fn on_message_list(&mut self, channel_id: Id, sender: Sender<Vec<Id>>) {
+        let items = self.list(format!("/messages/{channel_id}/"));
+        sender.send(items).unwrap();
+    }
+
+    //
+    // Channels
+    //
+    fn on_channel_list(&mut self, sender: Sender<Vec<Id>>) {
+        let results = self.list("/channels/");
+        sender.send(results).unwrap();
+    }
+
+    fn on_channel_create(&mut self, name: String, sender: Sender<Id>) {
+        let item = Channel::new(name);
+        let id = item.get_id();
+        self.set(format!("/channels/{id}"), item);
+        sender.send(id).unwrap();
+    }
+
+    fn on_channel_remove(&mut self, id: Id) {
+        self.remove(format!("/channels/{id}"))
+    }
+
+    fn on_channel_get_name(&mut self, id: Id, sender: Sender<Option<String>>) {
+        let channel = self.get::<_, Channel>(format!("/channels/{id}"));
+        let name = channel.map(|channel| channel.get_name().to_string());
+        sender.send(name).unwrap();
+    }
+
+    fn on_channel_set_name(&mut self, id: Id, name: String) {
+        let path = format!("/channels/{id}");
+        if let Some(mut channel) = self.get::<_, Channel>(&path) {
+            channel.set_name(name);
+            self.set(path, channel);
+        }
+    }
+
+    //
+    // Messages
+    //
 }
 
 #[telecomande::async_trait]
@@ -84,43 +231,15 @@ impl Processor for StorageProc {
     type Error = ();
 
     async fn handle(&mut self, command: Self::Command) -> Result<(), Self::Error> {
-        match command {
-            // channels
-            StorageCmd::ChannelDelete(id) => self.remove(format!("/channels/{id}")),
-            StorageCmd::ChannelCreate(name, sender) => {
-                let item = Channel::new(name);
-                let id = item.get_id();
-                self.set(format!("/channels/{id}"), item);
-                sender.send(id).unwrap();
-            }
-            StorageCmd::ChannelList(sender) => {
-                let results = self.list("/channels/");
-                sender.send(results).unwrap();
-            }
-            StorageCmd::ChannelGetName(id, sender) => {
-                let result = self
-                    .get::<_, Channel>(format!("/channels/{id}"))
-                    .map(|channel| channel.get_name().to_string());
-                sender.send(result).unwrap();
-            } //
-              // ChannelGetParent
-
-              // messages
-              // c
-              // d
-              // l
-              // gcontent
-        };
-
+        self.handle_command(command).await;
         Ok(())
     }
 }
 
 mod models;
-pub use models::{Channel, Msg, SerDeser, User};
+pub use models::{Channel, Message, SerDeser, User};
 
-fn list(db: &Db, path: impl ToString) -> impl Iterator<Item = Id> {
-    let path = path.to_string();
+fn list(db: &Db, path: String) -> Vec<Id> {
     let len = path.len();
     db.scan_prefix(path)
         .filter_map(move |result| -> Option<Id> {
@@ -129,74 +248,8 @@ fn list(db: &Db, path: impl ToString) -> impl Iterator<Item = Id> {
             let suffix = &string[len..];
             Id::from_string(suffix)
         })
+        .collect() // TODO: turn into iterator with limits
 }
 
-fn remove(db: &Db, path: impl ToString) {
-    let path = path.to_string();
-    db.remove(path).unwrap();
-}
-
-#[test]
-fn test_list() {
-    let db = sled::open("/tmp/test-db").unwrap();
-    db.insert("/some/path/123", b"hello1").unwrap();
-    db.insert("/some/path/1234", b"hello2").unwrap();
-    db.insert("/some/path/12345", b"hello3").unwrap();
-    let results = list(&db, "/some/path/".to_string());
-    let vec = results.collect::<Vec<_>>();
-    assert_eq!(
-        vec,
-        vec![
-            Id::from_string("123").unwrap(),
-            Id::from_string("1234").unwrap(),
-            Id::from_string("12345").unwrap()
-        ]
-    );
-}
-
-#[tokio::test]
-async fn test_channels() {
-    use telecomande::{Executor, SimpleExecutor};
-    // cleaning;
-    std::fs::remove_dir_all("/tmp/db-test").ok();
-
-    // instantiation
-    let store = SimpleExecutor::new(StorageProc::new("/tmp/db-test")).spawn();
-    let remote = store.remote();
-
-    // insertion
-    let (cmd, rec) = StorageCmd::new_channel_create("a-channel");
-    remote.send(cmd).unwrap();
-    let id = rec.await.unwrap();
-
-    // query all
-    let (cmd, rec) = StorageCmd::new_channel_list();
-    remote.send(cmd).unwrap();
-    let result = rec.await.unwrap();
-    assert_eq!(result.len(), 1);
-    let first = result[0];
-    assert_eq!(first, id);
-
-    // query property
-    let (cmd, rec) = StorageCmd::new_channel_get_name(id);
-    remote.send(cmd).unwrap();
-    let result = rec.await.unwrap();
-    assert_eq!(result.unwrap(), "a-channel".to_string());
-
-    // insertion
-    let (cmd, rec) = StorageCmd::new_channel_create("b-channel");
-    remote.send(cmd).unwrap();
-    let id2 = rec.await.unwrap();
-
-    // query all
-    let (cmd, rec) = StorageCmd::new_channel_list();
-    remote.send(cmd).unwrap();
-    let result = rec.await.unwrap();
-    assert_eq!(result.len(), 2);
-
-    // query property
-    let (cmd, rec) = StorageCmd::new_channel_get_name(id2);
-    remote.send(cmd).unwrap();
-    let result = rec.await.unwrap();
-    assert_eq!(result.unwrap(), "b-channel".to_string());
-}
+#[cfg(test)]
+mod tests;

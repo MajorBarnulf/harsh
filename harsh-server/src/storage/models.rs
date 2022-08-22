@@ -22,6 +22,10 @@ impl Channel {
     pub fn get_name(&self) -> &str {
         &self.name
     }
+
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -31,9 +35,26 @@ pub struct User {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Msg {
+pub struct Message {
     id: Id,
     content: String,
+}
+
+impl Message {
+    pub fn new(content: String) -> Self {
+        let id = Id::from_now();
+        Self { id, content }
+    }
+
+    pub fn get_id(&self) -> Id {
+        self.id
+    }
+    pub fn get_content(&self) -> &str {
+        &self.content
+    }
+    pub fn set_content(&mut self, content: String) {
+        self.content = content;
+    }
 }
 
 pub trait SerDeser: Serialize + DeserializeOwned {
