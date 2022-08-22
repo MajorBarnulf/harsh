@@ -74,6 +74,42 @@ impl StorageCmd {
     pub fn new_message_set_content(channel_id: Id, id: Id, content: String) -> Self {
         Self::MessageSetContent(channel_id, id, content)
     }
+
+    pub fn new_user_list() -> (Self, Receiver<Vec<Id>>) {
+        let (sender, receiver) = oneshot::channel();
+        let cmd = Self::UserList(sender);
+        (cmd, receiver)
+    }
+
+    pub fn new_user_create(name: String, pass: String) -> (Self, Receiver<Id>) {
+        let (sender, receiver) = oneshot::channel();
+        let cmd = Self::UserCreate(name, pass, sender);
+        (cmd, receiver)
+    }
+
+    pub fn new_user_delete(id: Id) -> Self {
+        Self::UserDelete(id)
+    }
+
+    pub fn new_user_get_name(id: Id) -> (Self, Receiver<Option<String>>) {
+        let (sender, receiver) = oneshot::channel();
+        let cmd = Self::UserGetName(id, sender);
+        (cmd, receiver)
+    }
+
+    pub fn new_user_set_name(id: Id, name: String) -> Self {
+        Self::UserSetName(id, name)
+    }
+
+    pub fn new_user_get_pass(id: Id) -> (Self, Receiver<Option<String>>) {
+        let (sender, receiver) = oneshot::channel();
+        let cmd = Self::UserGetPass(id, sender);
+        (cmd, receiver)
+    }
+
+    pub fn new_user_set_pass(id: Id, pass: String) -> Self {
+        Self::UserSetPass(id, pass)
+    }
 }
 
 pub struct StorageProc {

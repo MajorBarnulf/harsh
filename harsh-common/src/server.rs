@@ -61,7 +61,9 @@ pub struct MessageSetContent {
 }
 
 #[derive(Debug)]
-pub struct UserList {}
+pub struct UserList {
+    pub users: Vec<u64>,
+}
 
 #[derive(Debug)]
 pub struct UserCreate {
@@ -174,6 +176,30 @@ impl ServerRequest {
         })
     }
 
+    pub fn new_user_list(users: Vec<u64>) -> Self {
+        Self::UserList(UserList { users })
+    }
+
+    pub fn new_user_create(id: u64, name: String) -> Self {
+        Self::UserCreate(UserCreate { id, name })
+    }
+
+    pub fn new_user_delete(id: u64) -> Self {
+        Self::UserDelete(UserDelete { id })
+    }
+
+    pub fn new_user_get_name(id: u64, name: Option<String>) -> Self {
+        Self::UserGetName(UserGetName { id, name })
+    }
+
+    pub fn new_user_set_name(id: u64, name: String) -> Self {
+        Self::UserSetName(UserSetName { id, name })
+    }
+
+    pub fn new_user_set_pass(id: u64) -> Self {
+        Self::UserSetPass(UserSetPass { id })
+    }
+
     pub fn try_parse(line: &str) -> Option<Self> {
         use repr::Command::*;
         let command: repr::Command = serde_json::from_str(line).ok()?;
@@ -221,7 +247,7 @@ impl ServerRequest {
                 content,
                 id,
             }),
-            user_list {} => Self::UserList(UserList {}),
+            user_list { users } => Self::UserList(UserList { users }),
             user_create { id, name } => Self::UserCreate(UserCreate { id, name }),
             user_delete { id } => Self::UserDelete(UserDelete { id }),
             user_get_name { id, name } => Self::UserGetName(UserGetName { id, name }),
@@ -278,7 +304,7 @@ impl ServerRequest {
                 id,
                 content,
             },
-            Self::UserList(UserList {}) => user_list {},
+            Self::UserList(UserList { users }) => user_list { users },
             Self::UserCreate(UserCreate { id, name }) => user_create { id, name },
             Self::UserDelete(UserDelete { id }) => user_delete { id },
             Self::UserGetName(UserGetName { id, name }) => user_get_name { id, name },
@@ -342,7 +368,9 @@ mod repr {
             id: u64,
             content: String,
         },
-        user_list {},
+        user_list {
+            users: Vec<u64>,
+        },
         user_create {
             id: u64,
             name: String,

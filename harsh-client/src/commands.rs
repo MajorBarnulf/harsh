@@ -57,6 +57,30 @@ pub fn parse(input: &str) -> Option<Command> {
             let content = parts.next()?;
             ClientRequest::new_message_set_content(channel_id, id, content)
         }
+        "usrls" => ClientRequest::new_user_list(),
+        "usradd" => {
+            let name = parts.next()?;
+            let pass = parts.next()?;
+            ClientRequest::new_user_create(name, pass)
+        }
+        "usrdel" => {
+            let id = parts.next()?.parse().ok()?;
+            ClientRequest::new_user_delete(id)
+        }
+        "usrgname" => {
+            let id = parts.next()?.parse().ok()?;
+            ClientRequest::new_user_get_name(id)
+        }
+        "usrsname" => {
+            let id = parts.next()?.parse().ok()?;
+            let name = parts.next()?;
+            ClientRequest::new_user_set_name(id, name)
+        }
+        "usrspass" => {
+            let id = parts.next()?.parse().ok()?;
+            let pass = parts.next()?;
+            ClientRequest::new_user_set_pass(id, pass)
+        }
         _ => return None,
     };
 
@@ -85,6 +109,12 @@ pub const CMDS: &'static [Description] = &[
         &["channel_id", "id", "content"],
         "set a message's content",
     ),
+    Description::new("usrls", &[], "list users"),
+    Description::new("usradd", &["name", "pass"], "add a user"),
+    Description::new("usrdel", &["id"], "delete a user"),
+    Description::new("usrgname", &["id"], "get a user name"),
+    Description::new("usrsname", &["id", "name"], "set a user name"),
+    Description::new("usrspass", &["id", "pass"], "set a user pass"),
 ];
 
 pub fn smart_split(input: &str) -> Vec<String> {
@@ -103,12 +133,8 @@ pub fn smart_split(input: &str) -> Vec<String> {
         }
 
         match char {
-            '\\' => {
-                ignoring = true;
-            }
-            '"' => {
-                capturing = !capturing;
-            }
+            '\\' => ignoring = true,
+            '"' => capturing = !capturing,
             ' ' if !capturing => {
                 result.push(current);
                 current = String::new();

@@ -51,22 +51,54 @@ impl GatewayProc {
 
             // TODO: user
             UserList(c::UserList {}) => {
-                todo!()
+                let (cmd, rec) = StorageCmd::new_user_list();
+                self.storage.send(cmd).unwrap();
+                let result = rec.await.unwrap().iter().map(Id::to_u64).collect();
+                let request = ServerRequest::new_user_list(result);
+                let command = SessionCmd::new_send(address, request);
+                self.sessions.send(command).unwrap();
             }
+
             UserCreate(c::UserCreate { name, pass }) => {
-                todo!()
+                let (cmd, rec) = StorageCmd::new_user_create(name.clone(), pass);
+                self.storage.send(cmd).unwrap();
+                let id = rec.await.unwrap();
+                let request = ServerRequest::new_user_create(id.into(), name);
+                let command = SessionCmd::new_broadcast(request);
+                self.sessions.send(command).unwrap();
             }
+
             UserDelete(c::UserDelete { id }) => {
-                todo!()
+                let command = StorageCmd::new_user_delete(id.into());
+                self.storage.send(command).unwrap();
+                let request = ServerRequest::new_user_delete(id.into());
+                let command = SessionCmd::new_broadcast(request);
+                self.sessions.send(command).unwrap();
             }
+
             UserGetName(c::UserGetName { id }) => {
-                todo!()
+                let (cmd, rec) = StorageCmd::new_user_get_name(id.into());
+                self.storage.send(cmd).unwrap();
+                let name = rec.await.unwrap();
+                let request = ServerRequest::new_user_get_name(id.into(), name);
+                let command = SessionCmd::new_send(address, request);
+                self.sessions.send(command).unwrap();
             }
+
             UserSetName(c::UserSetName { id, name }) => {
-                todo!()
+                let command = StorageCmd::new_user_set_name(id.into(), name.clone());
+                self.storage.send(command).unwrap();
+                let request = ServerRequest::new_user_set_name(id.into(), name);
+                let command = SessionCmd::new_broadcast(request);
+                self.sessions.send(command).unwrap();
             }
+
             UserSetPass(c::UserSetPass { id, pass }) => {
-                todo!()
+                let command = StorageCmd::new_user_set_pass(id.into(), pass);
+                self.storage.send(command).unwrap();
+                let request = ServerRequest::new_user_set_pass(id.into());
+                let command = SessionCmd::new_send(address, request);
+                self.sessions.send(command).unwrap();
             }
         }
     }

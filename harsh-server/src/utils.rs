@@ -43,6 +43,12 @@ impl From<u64> for Id {
     }
 }
 
+impl From<Id> for u64 {
+    fn from(input: Id) -> Self {
+        input.to_u64()
+    }
+}
+
 #[test]
 fn test_string_convertion() {
     let id = Id::from_now();

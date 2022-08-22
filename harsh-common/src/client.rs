@@ -162,6 +162,24 @@ impl ClientRequest {
             content,
         })
     }
+    pub fn new_user_list() -> Self {
+        Self::UserList(UserList {})
+    }
+    pub fn new_user_create(name: String, pass: String) -> Self {
+        Self::UserCreate(UserCreate { name, pass })
+    }
+    pub fn new_user_delete(id: u64) -> Self {
+        Self::UserDelete(UserDelete { id })
+    }
+    pub fn new_user_get_name(id: u64) -> Self {
+        Self::UserGetName(UserGetName { id })
+    }
+    pub fn new_user_set_name(id: u64, name: String) -> Self {
+        Self::UserSetName(UserSetName { id, name })
+    }
+    pub fn new_user_set_pass(id: u64, pass: String) -> Self {
+        Self::UserSetPass(UserSetPass { id, pass })
+    }
 
     pub fn try_parse(line: &str) -> Option<Self> {
         use repr::Command::*;
