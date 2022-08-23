@@ -1,0 +1,3 @@
+[workspace]
+members = ["harsh-client", "harsh-server", "harsh-common"]
+
