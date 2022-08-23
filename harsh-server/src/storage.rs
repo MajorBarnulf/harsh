@@ -23,6 +23,12 @@ pub enum StorageCmd {
     UserSetName(Id, String),
     UserGetPass(Id, Sender<Option<String>>),
     UserSetPass(Id, String),
+    PermServerAddOp(Id),
+    PermServerRemoveOp(Id),
+    PermServerGetOp(Sender<Vec<Id>>),
+    PermChannelAddOp(Id, Id),
+    PermChannelRemoveOp(Id, Id),
+    PermChannelGetOp(Id, Sender<Vec<Id>>),
 }
 
 impl StorageCmd {
@@ -110,6 +116,34 @@ impl StorageCmd {
     pub fn new_user_set_pass(id: Id, pass: String) -> Self {
         Self::UserSetPass(id, pass)
     }
+
+    pub fn new_perm_server_add_op(user_id: Id) -> Self {
+        Self::PermServerAddOp(user_id)
+    }
+
+    pub fn new_perm_server_remove_op(user_id: Id) -> Self {
+        Self::PermServerRemoveOp(user_id)
+    }
+
+    pub fn new_perm_server_get_op() -> (Self, Receiver<Vec<Id>>) {
+        let (sender, receiver) = oneshot::channel();
+        let cmd = Self::PermServerGetOp(sender);
+        (cmd, receiver)
+    }
+
+    pub fn new_perm_channel_add_op(channel_id: Id, user_id: Id) -> Self {
+        Self::PermChannelAddOp(channel_id, user_id)
+    }
+
+    pub fn new_perm_channel_remove_op(channel_id: Id, user_id: Id) -> Self {
+        Self::PermChannelRemoveOp(channel_id, user_id)
+    }
+
+    pub fn new_perm_channel_get_op(channel_id: Id) -> (Self, Receiver<Vec<Id>>) {
+        let (sender, receiver) = oneshot::channel();
+        let command = Self::PermChannelGetOp(channel_id, sender);
+        (command, receiver)
+    }
 }
 
 pub struct StorageProc {
@@ -194,48 +228,32 @@ impl StorageProc {
             //
             // User
             //
-            UserList(sender) => {
-                let users = self.list("/users/");
-                sender.send(users).unwrap();
-            }
+            UserList(sender) => self.on_user_list(sender),
+            UserCreate(name, pass, sender) => self.on_user_create(name, pass, sender),
+            UserDelete(id) => self.on_user_delete(id),
+            UserGetName(id, sender) => self.on_user_get_name(id, sender),
+            UserSetName(id, name) => self.on_user_set_name(id, name),
+            UserGetPass(id, sender) => self.on_user_get_pass(id, sender),
+            UserSetPass(id, pass) => self.on_user_set_pass(id, pass),
 
-            UserCreate(name, pass, sender) => {
-                let user = User::new(name, pass);
-                let id = user.get_id();
-                self.set(format!("/users/{id}"), user);
-                sender.send(id).unwrap();
+            //
+            // Perms
+            //
+            PermServerGetOp(sender) => {
+                let result = self.list("/op/serv/".to_string());
+                sender.send(result).unwrap();
             }
-
-            UserDelete(id) => {
-                self.remove(format!("/users/{id}"));
+            PermServerAddOp(user_id) => self.set(format!("/op/serv/{user_id}"), true),
+            PermServerRemoveOp(user_id) => self.remove(format!("/op/serv/{user_id}")),
+            PermChannelAddOp(channel_id, user_id) => {
+                self.set(format!("/op/channels/{channel_id}/{user_id}"), true)
             }
-
-            UserGetName(id, sender) => {
-                let user = self.get::<_, User>(format!("/users/{id}"));
-                let name = user.map(|u| u.get_name().to_string());
-                sender.send(name).unwrap();
+            PermChannelRemoveOp(channel_id, user_id) => {
+                self.remove(format!("/op/channels/{channel_id}/{user_id}"))
             }
-
-            UserSetName(id, name) => {
-                let path = format!("/users/{id}");
-                if let Some(mut user) = self.get::<_, User>(&path) {
-                    user.set_name(name);
-                    self.set(path, user);
-                }
-            }
-
-            UserGetPass(id, sender) => {
-                let user = self.get::<_, User>(format!("/users/{id}"));
-                let name = user.map(|u| u.get_pass().to_string());
-                sender.send(name).unwrap();
-            }
-
-            UserSetPass(id, pass) => {
-                let path = format!("/users/{id}");
-                if let Some(mut user) = self.get::<_, User>(&path) {
-                    user.set_pass(pass);
-                    self.set(path, user);
-                }
+            PermChannelGetOp(channel_id, sender) => {
+                let result = self.list(format!("/op/channels/{channel_id}/"));
+                sender.send(result).unwrap();
             }
         };
     }
@@ -308,6 +326,54 @@ impl StorageProc {
             self.set(path, message);
         }
     }
+
+    //
+    // User
+    //
+
+    fn on_user_list(&mut self, sender: Sender<Vec<Id>>) {
+        let users = self.list("/users/");
+        sender.send(users).unwrap();
+    }
+
+    fn on_user_create(&mut self, name: String, pass: String, sender: Sender<Id>) {
+        let user = User::new(name, pass);
+        let id = user.get_id();
+        self.set(format!("/users/{id}"), user);
+        sender.send(id).unwrap();
+    }
+
+    fn on_user_delete(&mut self, id: Id) {
+        self.remove(format!("/users/{id}"));
+    }
+
+    fn on_user_get_name(&mut self, id: Id, sender: Sender<Option<String>>) {
+        let user = self.get::<_, User>(format!("/users/{id}"));
+        let name = user.map(|u| u.get_name().to_string());
+        sender.send(name).unwrap();
+    }
+
+    fn on_user_set_name(&mut self, id: Id, name: String) {
+        let path = format!("/users/{id}");
+        if let Some(mut user) = self.get::<_, User>(&path) {
+            user.set_name(name);
+            self.set(path, user);
+        }
+    }
+
+    fn on_user_get_pass(&mut self, id: Id, sender: Sender<Option<String>>) {
+        let user = self.get::<_, User>(format!("/users/{id}"));
+        let name = user.map(|u| u.get_pass().to_string());
+        sender.send(name).unwrap();
+    }
+
+    fn on_user_set_pass(&mut self, id: Id, pass: String) {
+        let path = format!("/users/{id}");
+        if let Some(mut user) = self.get::<_, User>(&path) {
+            user.set_pass(pass);
+            self.set(path, user);
+        }
+    }
 }
 
 #[telecomande::async_trait]
@@ -323,7 +389,7 @@ impl Processor for StorageProc {
 }
 
 mod models;
-pub use models::{Channel, Message, SerDeser, User};
+pub use models::{Channel, Message, Perm, SerDeser, User};
 
 fn list(db: &Db, path: String) -> Vec<Id> {
     let len = path.len();

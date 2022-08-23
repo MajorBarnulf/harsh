@@ -10,5 +10,5 @@ mod tests {
 pub use client::ClientRequest;
 pub mod client;
 
-pub use server::ServerRequest;
+pub use server::ServerEvent;
 pub mod server;

@@ -94,7 +94,7 @@ pub struct UserSetPass {
 }
 
 #[derive(Debug)]
-pub enum ServerRequest {
+pub enum ServerEvent {
     Pong(Pong),
 
     ChannelCreate(ChannelCreate),
@@ -117,7 +117,7 @@ pub enum ServerRequest {
     UserSetPass(UserSetPass),
 }
 
-impl ServerRequest {
+impl ServerEvent {
     pub fn new_pong(content: String) -> Self {
         Self::Pong(Pong { content })
     }

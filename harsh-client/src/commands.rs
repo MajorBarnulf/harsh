@@ -87,7 +87,7 @@ pub fn parse(input: &str) -> Option<Command> {
     Some(Command::Request(command))
 }
 
-pub const CMDS: &'static [Description] = &[
+pub const CMDS: &[Description] = &[
     // all commands
     Description::new("help", &[], "returns a help message"),
     Description::new(

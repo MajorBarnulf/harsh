@@ -3,13 +3,13 @@ use std::{
     process::exit,
 };
 
-use harsh_common::ServerRequest;
+use harsh_common::ServerEvent;
 use tokio::{
     io::{stdin, AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::TcpStream,
 };
 
-const ADDRESS: &'static str = "localhost:42069";
+const ADDRESS: &str = "localhost:42000";
 
 #[tokio::main]
 async fn main() {
@@ -21,13 +21,10 @@ async fn main() {
         let mut reader = BufReader::new(reader);
         loop {
             let mut line = String::new();
-            match reader.read_line(&mut line).await {
-                Ok(0) => {
-                    break;
-                }
-                _ => (),
+            if let Ok(0) = reader.read_line(&mut line).await {
+                break;
             }
-            if let Some(parsed) = ServerRequest::try_parse(&line) {
+            if let Some(parsed) = ServerEvent::try_parse(&line) {
                 println!("[main/info] received '{parsed:?}'");
             }
         }

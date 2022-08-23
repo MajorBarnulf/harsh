@@ -114,3 +114,9 @@ where
         db.insert(path, bytes).unwrap();
     }
 }
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub enum Perm {
+    OpServer,
+    OpChannel(Id),
+}
